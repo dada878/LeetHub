@@ -22,8 +22,13 @@ function handleMessage(request) {
       console.log('Closed pipe.');
     });
 
-    chrome.tabs.getSelected(null, function (tab) {
-      chrome.tabs.remove(tab.id);
+    /* chrome.tabs.getSelected() was deprecated in Chrome 16 */
+    chrome.tabs.query({
+      active: true,
+      lastFocusedWindow: true
+    }, function(tabs) {
+        var tab = tabs[0];
+        chrome.tabs.remove(tab.id);
     });
 
     /* Go to onboarding for UX */
@@ -44,3 +49,4 @@ function handleMessage(request) {
 }
 
 chrome.runtime.onMessage.addListener(handleMessage);
+console.log("loaded");

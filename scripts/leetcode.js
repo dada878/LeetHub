@@ -1,3 +1,5 @@
+const NEW_UI = true;
+
 /* Enum for languages supported by LeetCode. */
 const languages = {
   Python: '.py',
@@ -37,6 +39,7 @@ let difficulty = '';
 let uploadState = { uploading: false };
 
 /* Get file extension for submission */
+//FIXME: update calss name
 function findLanguage() {
   const tag = [
     ...document.getElementsByClassName(
@@ -253,119 +256,6 @@ function uploadGit(
   });
 }
 
-/* Function for finding and parsing the full code. */
-/* - At first find the submission details url. */
-/* - Then send a request for the details page. */
-/* - Finally, parse the code from the html reponse. */
-/* - Also call the callback if available when upload is success */
-function findCode(
-  uploadGit,
-  problemName,
-  fileName,
-  msg,
-  action,
-  cb = undefined,
-) {
-  /* Get the submission details url from the submission page. */
-  var submissionURL;
-  const e = document.getElementsByClassName('text-success');
-  if (checkElem(e)) {
-    // for normal problem submisson
-    const submissionRef = e[1].href;
-    submissionURL = submissionRef;
-  } else {
-    // for a submission in explore section
-    const submissionRef = document.getElementById('result-state');
-    submissionURL = submissionRef.href;
-  }
-
-  if (submissionURL != undefined) {
-    /* Request for the submission details page */
-    const xhttp = new XMLHttpRequest();
-    xhttp.onreadystatechange = function () {
-      if (this.readyState == 4 && this.status == 200) {
-        /* received submission details as html reponse. */
-        var doc = new DOMParser().parseFromString(
-          this.responseText,
-          'text/html',
-        );
-        /* the response has a js object called pageData. */
-        /* Pagedata has the details data with code about that submission */
-        var scripts = doc.getElementsByTagName('script');
-        for (var i = 0; i < scripts.length; i++) {
-          var text = scripts[i].innerText;
-          if (text.includes('pageData')) {
-            /* Considering the pageData as text and extract the substring
-            which has the full code */
-            var firstIndex = text.indexOf('submissionCode');
-            var lastIndex = text.indexOf('editCodeUrl');
-            var slicedText = text.slice(firstIndex, lastIndex);
-            /* slicedText has code as like as. (submissionCode: 'Details code'). */
-            /* So finding the index of first and last single inverted coma. */
-            var firstInverted = slicedText.indexOf("'");
-            var lastInverted = slicedText.lastIndexOf("'");
-            /* Extract only the code */
-            var codeUnicoded = slicedText.slice(
-              firstInverted + 1,
-              lastInverted,
-            );
-            /* The code has some unicode. Replacing all unicode with actual characters */
-            var code = codeUnicoded.replace(
-              /\\u[\dA-F]{4}/gi,
-              function (match) {
-                return String.fromCharCode(
-                  parseInt(match.replace(/\\u/g, ''), 16),
-                );
-              },
-            );
-
-            /*
-            for a submisssion in explore section we do not get probStat beforehand
-            so, parse statistics from submisson page
-            */
-            if (!msg) {
-              slicedText = text.slice(
-                text.indexOf('runtime'),
-                text.indexOf('memory'),
-              );
-              const resultRuntime = slicedText.slice(
-                slicedText.indexOf("'") + 1,
-                slicedText.lastIndexOf("'"),
-              );
-              slicedText = text.slice(
-                text.indexOf('memory'),
-                text.indexOf('total_correct'),
-              );
-              const resultMemory = slicedText.slice(
-                slicedText.indexOf("'") + 1,
-                slicedText.lastIndexOf("'"),
-              );
-              msg = `Time: ${resultRuntime}, Memory: ${resultMemory} - LeetHub`;
-            }
-
-            if (code != null) {
-              setTimeout(function () {
-                uploadGit(
-                  btoa(unescape(encodeURIComponent(code))),
-                  problemName,
-                  fileName,
-                  msg,
-                  action,
-                  true,
-                  cb,
-                );
-              }, 2000);
-            }
-          }
-        }
-      }
-    };
-
-    xhttp.open('GET', submissionURL, true);
-    xhttp.send();
-  }
-}
-
 /* Main parser function for the code */
 function parseCode() {
   const e = document.getElementsByClassName('CodeMirror-code');
@@ -403,26 +293,10 @@ function convertToSlug(string) {
     .replace(/^-+/, '') // Trim - from start of text
     .replace(/-+$/, ''); // Trim - from end of text
 }
+
+//FIXME: can not get problem number
 function getProblemNameSlug() {
-  const questionElem = document.getElementsByClassName(
-    'content__u3I1 question-content__JfgR',
-  );
-  const questionDescriptionElem = document.getElementsByClassName(
-    'question-description__3U1T',
-  );
-  let questionTitle = 'unknown-problem';
-  if (checkElem(questionElem)) {
-    let qtitle = document.getElementsByClassName('css-v3d350');
-    if (checkElem(qtitle)) {
-      questionTitle = qtitle[0].innerHTML;
-    }
-  } else if (checkElem(questionDescriptionElem)) {
-    let qtitle = document.getElementsByClassName('question-title');
-    if (checkElem(qtitle)) {
-      questionTitle = qtitle[0].innerText;
-    }
-  }
-  return addLeadingZeros(convertToSlug(questionTitle));
+  return document.title.replace(" - LeetCode", "").replaceAll(" ","-");
 }
 
 function addLeadingZeros(title) {
@@ -434,6 +308,7 @@ function addLeadingZeros(title) {
   return title;
 }
 
+//FIXME: can not get problem description
 /* Parser function for the question and tags */
 function parseQuestion() {
   var questionUrl = window.location.href;
@@ -449,49 +324,49 @@ function parseQuestion() {
   const questionDescriptionElem = document.getElementsByClassName(
     'question-description__3U1T',
   );
-  if (checkElem(questionElem)) {
-    const qbody = questionElem[0].innerHTML;
 
-    // Problem title.
-    let qtitle = document.getElementsByClassName('css-v3d350');
-    if (checkElem(qtitle)) {
-      qtitle = qtitle[0].innerHTML;
-    } else {
-      qtitle = 'unknown-problem';
-    }
+  // if (checkElem(questionElem)) {
 
-    // Problem difficulty, each problem difficulty has its own class.
-    const isHard = document.getElementsByClassName('css-t42afm');
-    const isMedium = document.getElementsByClassName('css-dcmtd5');
-    const isEasy = document.getElementsByClassName('css-14oi08n');
+  // const qbody = questionElem[0].innerHTML;
+  const qbody = "hello";
 
-    if (checkElem(isEasy)) {
-      difficulty = 'Easy';
-    } else if (checkElem(isMedium)) {
-      difficulty = 'Medium';
-    } else if (checkElem(isHard)) {
-      difficulty = 'Hard';
-    }
-    // Final formatting of the contents of the README for each problem
-    const markdown = `<h2><a href="${questionUrl}">${qtitle}</a></h2><h3>${difficulty}</h3><hr>${qbody}`;
-    return markdown;
-  } else if (checkElem(questionDescriptionElem)) {
-    let questionTitle = document.getElementsByClassName(
-      'question-title',
-    );
-    if (checkElem(questionTitle)) {
-      questionTitle = questionTitle[0].innerText;
-    } else {
-      questionTitle = 'unknown-problem';
-    }
+  // Problem title.
+  const qtitle = document.title.replace(" - LeetCode", "");
 
-    const questionBody = questionDescriptionElem[0].innerHTML;
-    const markdown = `<h2>${questionTitle}</h2><hr>${questionBody}`;
+  // Problem difficulty, each problem difficulty has its own class.
+  const isHard = document.getElementsByClassName('css-t42afm');
+  const isMedium = document.getElementsByClassName('css-dcmtd5');
+  const isEasy = document.getElementsByClassName('css-14oi08n');
 
-    return markdown;
-  }
+  /* cannot get difficulty */
+  // if (checkElem(isEasy)) {
+  //   difficulty = 'Easy';
+  // } else if (checkElem(isMedium)) {
+  //   difficulty = 'Medium';
+  // } else if (checkElem(isHard)) {
+  //   difficulty = 'Hard';
+  // }
 
-  return null;
+  // Final formatting of the contents of the README for each problem
+  const markdown = `<h2><a href="${questionUrl}">${qtitle}</a></h2><h3>${difficulty}</h3><hr>${qbody}`;
+  return markdown;
+  // } else if (checkElem(questionDescriptionElem)) {
+  //   let questionTitle = document.getElementsByClassName(
+  //     'question-title',
+  //   );
+  //   if (checkElem(questionTitle)) {
+  //     questionTitle = questionTitle[0].innerText;
+  //   } else {
+  //     questionTitle = 'unknown-problem';
+  //   }
+
+  //   const questionBody = questionDescriptionElem[0].innerHTML;
+  //   const markdown = `<h2>${questionTitle}</h2><hr>${questionBody}`;
+
+  //   return markdown;
+  // }
+
+  // return null;
 }
 
 /* Parser function for time/space stats */
@@ -528,7 +403,7 @@ document.addEventListener('click', (event) => {
       if (
         oldPath !== window.location.pathname &&
         oldPath ===
-          window.location.pathname.substring(0, oldPath.length) &&
+        window.location.pathname.substring(0, oldPath.length) &&
         !Number.isNaN(window.location.pathname.charAt(oldPath.length))
       ) {
         const date = new Date();
@@ -581,25 +456,50 @@ function getNotesIfAny() {
   return notes.trim();
 }
 
+/* To find and prease the code of the submission */
+function getSubmissionCode() {
+  let result = "";
+  const codearea = document.getElementsByClassName("bg-fill-4 dark:bg-dark-fill-4 mb-6 w-full rounded-lg p-4");
+  const codebox = codearea[0].querySelector("code");
+  const codelines = codebox.children;
+  for (let i = 0; i < codelines.length; i++) {
+    const lineEles = codelines[i].children;
+    for (let j = 0; j < lineEles.length; j++) {
+      result += lineEles[j].innerHTML;
+    }
+  }
+  return result;
+}
+
+/* To find the memery and runtime of the submission */
+function getSubmissionDetails() {
+  const details = document.querySelectorAll("div[class='flex items-center'] span[class='text-label-1 dark:text-dark-label-1 ml-2 font-medium']");
+  const runtime = details[0].innerHTML;
+  const memery = details[1].innerHTML;
+  return { runtime: runtime, memery: memery };
+}
+
+/* Call this any times */
 const loader = setInterval(() => {
   let code = null;
   let probStatement = null;
   let probStats = null;
   let probType;
-  const successTag = document.getElementsByClassName('success__3Ai7');
+  const successTag = document.getElementsByClassName('text-green-s dark:text-dark-green-s flex items-center gap-2 text-[16px] font-medium leading-6');
   const resultState = document.getElementById('result-state');
   var success = false;
   // check success tag for a normal problem
   if (
     checkElem(successTag) &&
-    successTag[0].className === 'success__3Ai7' &&
-    successTag[0].innerText.trim() === 'Success'
+    successTag[0].innerText.trim() === 'Accepted' &&
+    //TODO: Add more checker for mark uploaded
+    !successTag[0].classList.contains("marked_as_success")
   ) {
-    console.log(successTag[0]);
     success = true;
     probType = NORMAL_PROBLEM;
   }
 
+  //TODO: Add checker for explore section problem
   // check success state for a explore section problem
   else if (
     resultState &&
@@ -615,88 +515,90 @@ const loader = setInterval(() => {
     probStats = parseStats();
   }
 
-  if (probStatement !== null) {
-    switch (probType) {
-      case NORMAL_PROBLEM:
-        successTag[0].classList.add('marked_as_success');
-        break;
-      case EXPLORE_SECTION_PROBLEM:
-        resultState.classList.add('marked_as_success');
-        break;
-      default:
-        console.error(`Unknown problem type ${probType}`);
-        return;
-    }
-
-    const problemName = getProblemNameSlug();
-    const language = findLanguage();
-    if (language !== null) {
-      // start upload indicator here
-      startUpload();
-      chrome.storage.local.get('stats', (s) => {
-        const { stats } = s;
-        const filePath = problemName + problemName + language;
-        let sha = null;
-        if (
-          stats !== undefined &&
-          stats.sha !== undefined &&
-          stats.sha[filePath] !== undefined
-        ) {
-          sha = stats.sha[filePath];
-        }
-
-        /* Only create README if not already created */
-        if (sha === null) {
-          /* @TODO: Change this setTimeout to Promise */
-          uploadGit(
-            btoa(unescape(encodeURIComponent(probStatement))),
-            problemName,
-            'README.md',
-            readmeMsg,
-            'upload',
-          );
-        }
-      });
-
-      /* get the notes and upload it */
-      /* only upload notes if there is any */
-      notes = getNotesIfAny();
-      if (notes.length > 0) {
-        setTimeout(function () {
-          if (notes != undefined && notes.length != 0) {
-            console.log('Create Notes');
-            // means we can upload the notes too
-            uploadGit(
-              btoa(unescape(encodeURIComponent(notes))),
-              problemName,
-              'NOTES.md',
-              createNotesMsg,
-              'upload',
-            );
-          }
-        }, 500);
-      }
-
-      /* Upload code to Git */
-      setTimeout(function () {
-        findCode(
-          uploadGit,
-          problemName,
-          problemName + language,
-          probStats,
-          'upload',
-          // callback is called when the code upload to git is a success
-          () => {
-            if (uploadState['countdown'])
-              clearTimeout(uploadState['countdown']);
-            delete uploadState['countdown'];
-            uploadState.uploading = false;
-            markUploaded();
-          },
-        ); // Encode `code` to base64
-      }, 1000);
-    }
+  if (probStatement === null) return;
+  switch (probType) {
+    case NORMAL_PROBLEM:
+      successTag[0].classList.add('marked_as_success');
+      break;
+    case EXPLORE_SECTION_PROBLEM:
+      resultState.classList.add('marked_as_success');
+      break;
+    default:
+      console.error(`Unknown problem type ${probType}`);
+      return;
   }
+
+  const problemName = getProblemNameSlug();
+
+  //TODO: findLanguage()
+  const language = ".cpp";
+  if (language === null) return;
+
+  // start upload indicator here
+  startUpload();
+  chrome.storage.local.get('stats', (s) => {
+    const { stats } = s;
+    const filePath = problemName + problemName + language;
+    let sha = null;
+    if (
+      stats !== undefined &&
+      stats.sha !== undefined &&
+      stats.sha[filePath] !== undefined
+    ) {
+      sha = stats.sha[filePath];
+    }
+
+    /* Only create README if not already created */
+    if (sha === null) {
+      /* @TODO: Change this setTimeout to Promise */
+      uploadGit(
+        btoa(unescape(encodeURIComponent(probStatement))),
+        problemName,
+        'README.md',
+        readmeMsg,
+        'upload',
+      );
+    }
+  });
+
+  /* get the notes and upload it */
+  /* only upload notes if there is any */
+  notes = getNotesIfAny();
+  if (notes.length > 0) {
+    setTimeout(function () {
+      if (notes != undefined && notes.length != 0) {
+        console.log('Create Notes');
+        // means we can upload the notes too
+        uploadGit(
+          btoa(unescape(encodeURIComponent(notes))),
+          problemName,
+          'NOTES.md',
+          createNotesMsg,
+          'upload',
+        );
+      }
+    }, 500);
+  }
+  /* Upload code to Git */
+  setTimeout(function () {
+    const code = getSubmissionCode();
+    uploadGit(
+      btoa(unescape(encodeURIComponent(code))),
+      problemName,
+      problemName + language,
+      `Time: ${getSubmissionDetails().runtime}, Memory: ${getSubmissionDetails().memery} - LeetHub`,
+      'upload',
+      true,
+      () => {
+        if (uploadState['countdown'])
+          clearTimeout(uploadState['countdown']);
+        delete uploadState['countdown'];
+        uploadState.uploading = false;
+        markUploaded();
+      },
+    );
+  }, 1000);
+
 }, 1000);
 
 /* Since we dont yet have callbacks/promises that helps to find out if things went bad */
